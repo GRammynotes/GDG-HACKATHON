@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Study Planner - Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-logo">SS</span>
+          <div class="brand-text">
+            <h1>Smart Study Planner</h1>
+            <p class="brand-subtitle">Dashboard & Profile</p>
+          </div>
+        </div>
+        <nav class="nav-tabs">
+          <button id="tab-dashboard" class="nav-tab active">Dashboard</button>
+          <button id="tab-profile" class="nav-tab">Profile</button>
+        </nav>
+      </header>
+
+      <main class="main-content">
+        <!-- DASHBOARD VIEW -->
+        <section id="view-dashboard" class="view active">
+          <section class="summary-grid">
+            <div class="card summary-card">
+              <h2>Overall Progress</h2>
+              <div class="progress-ring-wrapper">
+                <div class="progress-ring">
+                  <svg viewBox="0 0 36 36">
+                    <path
+                      class="ring-bg"
+                      d="M18 2.0845
+                         a 15.9155 15.9155 0 0 1 0 31.831
+                         a 15.9155 15.9155 0 0 1 0 -31.831"
+                    ></path>
+                    <path
+                      id="overall-ring"
+                      class="ring-progress"
+                      stroke-dasharray="0, 100"
+                      d="M18 2.0845
+                         a 15.9155 15.9155 0 0 1 0 31.831
+                         a 15.9155 15.9155 0 0 1 0 -31.831"
+                    ></path>
+                  </svg>
+                  <div class="ring-label">
+                    <span id="overall-progress-label">0%</span>
+                    <small>Completed</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card summary-card">
+              <h2>Current Plan</h2>
+              <dl class="summary-list" id="current-plan">
+                <div>
+                  <dt>Academic Year</dt>
+                  <dd id="summary-year">—</dd>
+                </div>
+                <div>
+                  <dt>Semester</dt>
+                  <dd id="summary-semester">—</dd>
+                </div>
+                <div>
+                  <dt>Subjects</dt>
+                  <dd id="summary-subjects">—</dd>
+                </div>
+                <div>
+                  <dt>Target Completion</dt>
+                  <dd id="summary-target">—</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <section class="subjects-section">
+            <div class="section-header">
+              <h2>Subject-wise Progress</h2>
+              <p class="muted">
+                Mark a topic as studied to update your dashboard in real-time.
+              </p>
+            </div>
+            <div id="subjects-container" class="subjects-grid"></div>
+          </section>
+        </section>
+
+        <!-- PROFILE VIEW -->
+        <section id="view-profile" class="view">
+          <div class="profile-layout">
+            <section class="card profile-main">
+              <div class="profile-header">
+                <div class="avatar">S</div>
+                <div>
+                  <h2 id="profile-name-display">Student Name</h2>
+                  <p id="profile-email-display" class="muted">
+                    student@example.com
+                  </p>
+                  <span class="pill" id="profile-year-semester-pill">Year — • Sem —</span>
+                </div>
+              </div>
+
+              <form id="profile-form" class="profile-form">
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="profile-name">Name</label>
+                    <input id="profile-name" type="text" />
+                  </div>
+                  <div class="form-field">
+                    <label for="profile-email">Email (fixed)</label>
+                    <input id="profile-email" type="email" disabled />
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="profile-department">Department</label>
+                    <select id="profile-department">
+                      <option value="COMPS">Computer Engineering</option>
+                      <option value="IT">Information Technology</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="profile-year">Academic Year</label>
+                    <select id="profile-year">
+                      <option value="3rd Year">3rd Year</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="profile-semester">Semester</label>
+                    <select id="profile-semester">
+                      <option value="">Select semester</option>
+                      <option value="Sem 1">Sem 1</option>
+                      <option value="Sem 2">Sem 2</option>
+                      <option value="Sem 3">Sem 3</option>
+                      <option value="Sem 4">Sem 4</option>
+                      <option value="Sem 5">Sem 5</option>
+                      <option value="Sem 6">Sem 6</option>
+                      <option value="Sem 7">Sem 7</option>
+                      <option value="Sem 8">Sem 8</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-field">
+                  <label for="profile-subjects">Selected Subjects</label>
+                  <textarea
+                    id="profile-subjects"
+                    rows="2"
+                    placeholder="Auto-filled from Pillai College syllabus for the chosen year"
+                  ></textarea>
+                  <p class="field-hint">
+                    Auto-synced from Pillai College of Engineering (New Panvel) syllabus per year.
+                  </p>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="profile-target-date">Target Completion Date</label>
+                    <input id="profile-target-date" type="date" />
+                  </div>
+                </div>
+
+                <div class="profile-actions">
+                  <button type="button" id="btn-edit-profile" class="btn secondary">
+                    Edit
+                  </button>
+                  <button type="submit" id="btn-save-profile" class="btn primary" disabled>
+                    Save Changes
+                  </button>
+                  <button type="button" id="btn-reset-progress" class="btn danger ghost">
+                    Reset Progress
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <aside class="card profile-sidebar">
+              <h3>Progress Overview</h3>
+              <div id="profile-progress-list" class="profile-progress-list"></div>
+            </aside>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <small>
+          Smart Study Planner &mdash; Demo Dashboard & Profile. Data is stored locally
+          in your browser.
+        </small>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+
+
