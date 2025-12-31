@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import ProfileSection from "./ProfileSection";
 import styles from "./dashboard.module.css";
 import { auth, db } from "@/lib/firebase";
@@ -122,6 +123,7 @@ const handleLogout = async () => {
 };
 
   const [view, setView] = useState<"dashboard" | "profile">("dashboard");
+  const [openQuizzes, setOpenQuizzes] = useState<Set<string>>(new Set());
   const [state, setState] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -177,6 +179,38 @@ const handleLogout = async () => {
       }
       return newState;
     });
+  };
+
+  const handleOpenQuiz = async (subjectId: string, subjectName: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      // Mark quiz as opened in Firestore
+      await setDoc(
+        doc(db, "users", user.uid, "quizzes", subjectId),
+        {
+          subjectId,
+          subjectName,
+          openedAt: new Date(),
+          status: "in_progress",
+        },
+        { merge: true }
+      );
+
+      // Update local state
+      setOpenQuizzes((prev) => new Set(prev).add(subjectId));
+
+      // Show toast notification
+      toast.success("Quiz Started", {
+        description: `Quiz for ${subjectName} has been opened.`,
+      });
+    } catch (error) {
+      console.error("Error opening quiz:", error);
+      toast.error("Failed to open quiz", {
+        description: "Please try again.",
+      });
+    }
   };
 
   // Sync to LocalStorage
@@ -245,19 +279,11 @@ const handleLogout = async () => {
         <div className={styles.brand}>
           <span className={styles.brandLogo}>SS</span>
           <div className={styles.brandText}>
-            <h1>Smart Study Planner</h1>
-            <p className={styles.brandSubtitle}>Dashboard & Profile</p>
+            <h1 className="font-display">Smart Study Planner</h1>
+            <p className={styles.brandSubtitle}>Dashboard</p>
           </div>
         </div>
         <nav className={styles.navTabs}>
-          <button
-  onClick={handleLogout}
-  className={styles.navTab}
-  style={{ color: "#ef4444" }}
->
-  Logout
-</button>
-
           <button
             id="tab-dashboard"
             className={`${styles.navTab} ${view === "dashboard" ? styles.active : ""}`}
@@ -272,6 +298,13 @@ const handleLogout = async () => {
           >
             Profile
           </button>
+          <button
+            onClick={handleLogout}
+            className={styles.navTab}
+            style={{ color: "#ef4444" }}
+          >
+            Logout
+          </button>
         </nav>
       </header>
 
@@ -280,7 +313,7 @@ const handleLogout = async () => {
           <>
             <section className={styles.summaryGrid}>
               <div className={`${styles.card} ${styles.summaryCard}`}>
-                <h2>Overall Progress</h2>
+                <h2 className="font-display">Progress</h2>
                 <div className={styles.progressRingWrapper}>
                   <div className={styles.progressRing}>
                     <svg viewBox="0 0 36 36">
@@ -310,7 +343,7 @@ const handleLogout = async () => {
               </div>
 
               <div className={`${styles.card} ${styles.summaryCard}`}>
-                <h2>Current Plan</h2>
+                <h2 className="font-display">Plan</h2>
                 <dl className={styles.summaryList}>
                   <div>
                     <dt>Academic Year</dt>
@@ -334,10 +367,7 @@ const handleLogout = async () => {
 
             <section className={styles.subjectsSection}>
               <div className={styles.sectionHeader}>
-                <h2>Subject-wise Progress</h2>
-                <p className={styles.muted}>
-                  Mark a topic as studied to update your dashboard in real-time.
-                </p>
+                <h2 className="font-display">Subjects</h2>
               </div>
               <div className={styles.subjectsGrid}>
                 {state.subjects.map((subject) => {
@@ -384,8 +414,12 @@ const handleLogout = async () => {
                         ))}
                       </ul>
                       <div className={styles.subjectActions}>
-                        <button className={`${styles.btn} ${styles.primary}`} type="button">
-                          Open Quiz (Coming soon)
+                        <button
+                          className={`${styles.btn} ${styles.primary}`}
+                          type="button"
+                          onClick={() => handleOpenQuiz(subject.id, subject.name)}
+                        >
+                          {openQuizzes.has(subject.id) ? "Quiz Active" : "Open Quiz"}
                         </button>
                       </div>
                     </article>
@@ -429,9 +463,7 @@ const handleLogout = async () => {
       </main>
 
       <footer className={styles.appFooter}>
-        <small>
-          Smart Study Planner &mdash; Demo Dashboard & Profile. Data is stored locally in your browser.
-        </small>
+        <small>Smart Study Planner</small>
       </footer>
     </div>
   );

@@ -51,6 +51,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        coral: "#FF724C",
+        golden: "#FDBF50",
+        "light-bg": "#F4F4F8",
+        "dark-navy": "#2A2C41",
         ai: {
           blue: "hsl(var(--ai-blue))",
           purple: "hsl(var(--ai-purple))",

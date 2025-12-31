@@ -116,7 +116,7 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
       <div className={styles.profileHeader}>
         <div className={styles.avatar}>{initial}</div>
         <div>
-          <h2>{formData.name || "Student"}</h2>
+          <h2 className="font-display">{formData.name || "Student"}</h2>
           <p className={styles.muted}>{formData.email}</p>
           <span className={styles.pill}>
             {formData.year} • {formData.semester}
