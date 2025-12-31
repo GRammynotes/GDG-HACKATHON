@@ -31,13 +31,16 @@ const LoginPage = () => {
     username: "",
   });
 
-  // Redirect if already logged in (only if Firebase is configured)
+  // Redirect if already logged in - check for AIM profile
   useEffect(() => {
     if (!authLoading && currentUser) {
-      if (userData?.onboardingCompleted) {
+      // Check if user has AIM profile (academicProfile)
+      if (userData?.academicProfile) {
+        // User has set their goal, go to personalized dashboard
         navigate("/dashboard");
       } else {
-        navigate("/onboarding");
+        // User needs to set their goal, go to landing page
+        navigate("/landing");
       }
     }
   }, [currentUser, userData, navigate, authLoading]);
@@ -99,9 +102,9 @@ const LoginPage = () => {
         }
         await register(registerData.email, registerData.password, registerData.fullName, registerData.username);
         toast.success("Account created!", {
-          description: "Redirecting to onboarding...",
+          description: "Redirecting to goal setting...",
         });
-        navigate("/onboarding");
+        navigate("/landing");
       }
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -199,8 +202,8 @@ const LoginPage = () => {
                   key={m}
                   onClick={() => setMode(m)}
                   className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${mode === m
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-foreground"
+                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {m === "login" ? "Login" : "Register"}

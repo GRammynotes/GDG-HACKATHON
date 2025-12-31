@@ -1,7 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import styles from "./dashboard.module.css";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface ProfileState {
@@ -40,6 +41,17 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
   useEffect(() => {
     if (!currentUser || !userData) return;
 
+    // Validate and fix targetDate if it's invalid (e.g., 1978)
+    let targetDate = userData.targetDate || "";
+    if (targetDate) {
+      const date = new Date(targetDate);
+      const currentYear = new Date().getFullYear();
+      // If date is before 2000, it's likely invalid, reset it
+      if (date.getFullYear() < 2000) {
+        targetDate = "";
+      }
+    }
+
     const hydratedProfile: ProfileState = {
       name: userData.fullName || "",
       email: currentUser.email || "",
@@ -48,7 +60,7 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
       semester: userData.semester || "Sem 5",
       subjectsLabel:
         "3rd Year PCE subjects based on chosen department (Comps / IT)",
-      targetDate: userData.targetDate || "",
+      targetDate: targetDate,
     };
 
     setFormData(hydratedProfile);
@@ -62,6 +74,10 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
 
   const handleEdit = () => {
     if (editing) {
+      // Cancel - reset to original state
+      setFormData(state.profile);
+    } else {
+      // Start editing - populate form with current state
       setFormData(state.profile);
     }
     setEditing(!editing);
@@ -71,38 +87,74 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    // Update local dashboard state
-    setState((prev: any) => ({
-      ...prev,
-      profile: formData,
-    }));
+    // Validate target date (must be future date)
+    if (formData.targetDate) {
+      const targetDate = new Date(formData.targetDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
 
-    // Persist to Firestore
-    await setDoc(
-      doc(db, "users", currentUser.uid),
-      {
-        fullName: formData.name,
-        department: formData.department,
-        year: formData.year,
-        semester: formData.semester,
-        targetDate: formData.targetDate,
-      },
-      { merge: true }
-    );
+      if (targetDate <= today) {
+        toast.error("Target completion date must be in the future");
+        return;
+      }
+    }
 
-    setEditing(false);
+    try {
+      // Update local dashboard state
+      setState((prev: any) => ({
+        ...prev,
+        profile: formData,
+      }));
+
+      // Persist to Firestore
+      await setDoc(
+        doc(db, "users", currentUser.uid),
+        {
+          fullName: formData.name,
+          department: formData.department,
+          year: formData.year,
+          semester: formData.semester,
+          targetDate: formData.targetDate,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
+
+      setEditing(false);
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      toast.error("Failed to save profile. Please try again.");
+    }
   };
 
-  const handleResetProgress = () => {
+  const handleResetProgress = async () => {
     if (!confirm("This will reset all topic progress. Continue?")) return;
+    if (!currentUser) return;
 
-    setState((prev: any) => ({
-      ...prev,
-      subjects: prev.subjects.map((s: any) => ({
-        ...s,
-        topics: s.topics.map((t: any) => ({ ...t, completed: false })),
-      })),
-    }));
+    try {
+      // Reset local state
+      setState((prev: any) => ({
+        ...prev,
+        subjects: prev.subjects.map((s: any) => ({
+          ...s,
+          topics: s.topics.map((t: any) => ({ ...t, completed: false })),
+        })),
+      }));
+
+      // Reset in Firestore - delete all progress documents
+      const progressCollection = collection(db, "users", currentUser.uid, "progress");
+      const progressSnapshot = await getDocs(progressCollection);
+
+      const deletePromises = progressSnapshot.docs.map((doc) => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+
+      toast.success("Progress reset successfully");
+    } catch (error) {
+      console.error("Error resetting progress:", error);
+      toast.error("Failed to reset progress. Please try again.");
+    }
   };
 
   const initial =
@@ -196,12 +248,42 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
             <label>Target Completion Date</label>
             <input
               type="date"
-              value={formData.targetDate}
+              value={
+                formData.targetDate
+                  ? (() => {
+                    try {
+                      const date = new Date(formData.targetDate);
+                      if (isNaN(date.getTime()) || date.getFullYear() < 2000) return "";
+                      return date.toISOString().split("T")[0];
+                    } catch {
+                      return "";
+                    }
+                  })()
+                  : ""
+              }
               onChange={(e) =>
                 setFormData({ ...formData, targetDate: e.target.value })
               }
               disabled={!editing}
+              min={new Date().toISOString().split("T")[0]}
             />
+            {formData.targetDate && (() => {
+              try {
+                const date = new Date(formData.targetDate);
+                if (isNaN(date.getTime()) || date.getFullYear() < 2000) return null;
+                return (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {date.toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                  </p>
+                );
+              } catch {
+                return null;
+              }
+            })()}
           </div>
         </div>
 

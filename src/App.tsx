@@ -10,6 +10,8 @@ import LoginPage from "./pages/LoginPage";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import LandingPage from "./pages/LandingPage";
+import StudyMaterials from "./pages/StudyMaterials";
+import SubjectStudy from "./pages/SubjectStudy";
 import NotFound from "./pages/NotFound";
 import SplashScreen from "./components/SplashScreen";
 
@@ -60,6 +62,22 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/materials"
+                element={
+                  <ProtectedRoute>
+                    <StudyMaterials />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/subject/:subjectName"
+                element={
+                  <ProtectedRoute>
+                    <SubjectStudy />
                   </ProtectedRoute>
                 }
               />

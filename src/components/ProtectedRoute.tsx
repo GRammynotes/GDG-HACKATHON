@@ -9,21 +9,21 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const location = useLocation();
 
   const [checking, setChecking] = useState(true);
-  const [onboardingDone, setOnboardingDone] = useState(false);
+  const [hasAimProfile, setHasAimProfile] = useState(false);
 
   useEffect(() => {
-    const checkOnboarding = async () => {
+    const checkAimProfile = async () => {
       if (!currentUser) {
         setChecking(false);
         return;
       }
 
       const snap = await getDoc(doc(db, "users", currentUser.uid));
-      setOnboardingDone(!!snap.data()?.onboardingCompleted);
+      setHasAimProfile(!!snap.data()?.academicProfile);
       setChecking(false);
     };
 
-    checkOnboarding();
+    checkAimProfile();
   }, [currentUser]);
 
   if (loading || checking) return null;
@@ -32,9 +32,14 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     return <Navigate to="/" replace />;
   }
 
-  // 🚫 If onboarding already completed, block onboarding page
-  if (onboardingDone && location.pathname === "/onboarding") {
+  // 🚫 If landing page and user already has AIM profile, redirect to dashboard
+  if (hasAimProfile && location.pathname === "/landing") {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // 🚫 If dashboard and user doesn't have AIM profile, redirect to landing
+  if (!hasAimProfile && location.pathname === "/dashboard") {
+    return <Navigate to="/landing" replace />;
   }
 
   return children;

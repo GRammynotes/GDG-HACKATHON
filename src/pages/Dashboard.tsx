@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import ProfileSection from "./ProfileSection";
+import QuizModal from "@/components/QuizModal";
 import styles from "./dashboard.module.css";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -39,6 +40,7 @@ const DEPT_SUBJECTS_3RD_YEAR: Record<string, Subject[]> = {
         { id: "arch", title: "Architecture & Instruction Set", completed: false },
         { id: "interfacing", title: "Interfacing & Peripherals", completed: false },
         { id: "programming", title: "Assembly & C Programming", completed: false },
+        { id: "advanced", title: "Advanced Microcontroller Applications", completed: false },
       ],
     },
     {
@@ -66,6 +68,7 @@ const DEPT_SUBJECTS_3RD_YEAR: Record<string, Subject[]> = {
         { id: "divide", title: "Divide & Conquer", completed: false },
         { id: "dp", title: "Dynamic Programming", completed: false },
         { id: "greedy", title: "Greedy & Graph Algos", completed: false },
+        { id: "complexity", title: "Complexity Analysis & NP-Completeness", completed: false },
       ],
     },
     {
@@ -113,17 +116,28 @@ const defaultState = {
   subjects: DEPT_SUBJECTS_3RD_YEAR.COMPS,
 };
 
-const Dashboard = () => {
-  const { logout } = useAuth();
-const navigate = useNavigate();
-
-const handleLogout = async () => {
-  await logout();
-  navigate("/", { replace: true });
+const AIM_LABELS: Record<string, { title: string; range: string; description: string }> = {
+  passing: { title: "Passing", range: "≈ 6.0 CGPA", description: "Just clear the bar with exam-focused, minimum-viable prep." },
+  "below-average": { title: "Below Average", range: "6.5 – 7.0", description: "Cover all must-pass topics with light conceptual depth." },
+  average: { title: "Average", range: "7.0 – 7.5", description: "Balanced understanding + exam practice with a safe buffer." },
+  "above-average": { title: "Above Average", range: "7.5 – 8.5", description: "Deeper concepts, consistent practice and strong internals." },
+  topper: { title: "Topper", range: "9.0+", description: "Max depth, advanced questions and high-intensity scheduling." },
 };
+
+const Dashboard = () => {
+  const { logout, currentUser, userData } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
 
   const [view, setView] = useState<"dashboard" | "profile">("dashboard");
   const [openQuizzes, setOpenQuizzes] = useState<Set<string>>(new Set());
+  const [quizModalOpen, setQuizModalOpen] = useState(false);
+  const [selectedQuizSubject, setSelectedQuizSubject] = useState<{ id: string; name: string; topics: string[] } | null>(null);
+  const [aimProfile, setAimProfile] = useState<any>(null);
   const [state, setState] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -160,7 +174,9 @@ const handleLogout = async () => {
     return Math.round((completedTopics / totalTopics) * 100);
   };
 
-  const toggleTopicCompletion = (subjectId: string, topicId: string, completed: boolean) => {
+  const toggleTopicCompletion = async (subjectId: string, topicId: string, completed: boolean) => {
+    const user = auth.currentUser;
+
     setState((prev) => {
       const newSubjects = prev.subjects.map((s) => {
         if (s.id === subjectId) {
@@ -179,38 +195,33 @@ const handleLogout = async () => {
       }
       return newState;
     });
+
+    // Sync to Firestore in real-time
+    if (user) {
+      try {
+        await setDoc(
+          doc(db, "users", user.uid, "progress", `${subjectId}_${topicId}`),
+          {
+            subjectId,
+            topicId,
+            completed,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+      } catch (error) {
+        console.error("Error syncing progress to Firestore:", error);
+      }
+    }
   };
 
-  const handleOpenQuiz = async (subjectId: string, subjectName: string) => {
-    const user = auth.currentUser;
-    if (!user) return;
+  const handleOpenQuiz = (subjectId: string, subjectName: string) => {
+    const subject = state.subjects.find((s) => s.id === subjectId);
+    if (!subject) return;
 
-    try {
-      // Mark quiz as opened in Firestore
-      await setDoc(
-        doc(db, "users", user.uid, "quizzes", subjectId),
-        {
-          subjectId,
-          subjectName,
-          openedAt: new Date(),
-          status: "in_progress",
-        },
-        { merge: true }
-      );
-
-      // Update local state
-      setOpenQuizzes((prev) => new Set(prev).add(subjectId));
-
-      // Show toast notification
-      toast.success("Quiz Started", {
-        description: `Quiz for ${subjectName} has been opened.`,
-      });
-    } catch (error) {
-      console.error("Error opening quiz:", error);
-      toast.error("Failed to open quiz", {
-        description: "Please try again.",
-      });
-    }
+    const topics = subject.topics.map((t) => t.title);
+    setSelectedQuizSubject({ id: subjectId, name: subjectName, topics });
+    setQuizModalOpen(true);
   };
 
   // Sync to LocalStorage
@@ -242,17 +253,24 @@ const handleLogout = async () => {
     return () => clearTimeout(timeoutId);
   }, [state]);
 
-  // Load from Firestore on mount
+  // Load AIM profile and dashboard state from Firestore
   useEffect(() => {
-    const fetchFromFirestore = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+    const user = auth.currentUser;
+    if (!user) return;
 
+    const fetchFromFirestore = async () => {
       try {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
+
+          // Load AIM profile
+          if (data.academicProfile) {
+            setAimProfile(data.academicProfile);
+          }
+
+          // Load dashboard state
           if (data.dashboardState) {
             // Merge remote state
             setState(prev => ({
@@ -266,9 +284,61 @@ const handleLogout = async () => {
       }
     };
 
-    // Attempt fetch after a brief delay to ensure auth is ready (or use onAuthStateChanged listener, 
-    // but for this component, a simple check might suffice if already redirected)
+    // Load progress from Firestore
+    const loadProgress = async () => {
+      try {
+        // Get all progress documents for this user
+        const progressCollection = collection(db, "users", user.uid, "progress");
+        const progressSnapshot = await getDocs(progressCollection);
+
+        if (!progressSnapshot.empty) {
+          setState((prev) => {
+            const newSubjects = prev.subjects.map((subject) => {
+              const subjectTopics = subject.topics.map((topic) => {
+                const progressDoc = progressSnapshot.docs.find(
+                  (doc) => doc.data().subjectId === subject.id && doc.data().topicId === topic.id
+                );
+                if (progressDoc) {
+                  return { ...topic, completed: progressDoc.data().completed || false };
+                }
+                return topic;
+              });
+              return { ...subject, topics: subjectTopics };
+            });
+            return { ...prev, subjects: newSubjects };
+          });
+        }
+      } catch (error) {
+        console.error("Error loading progress:", error);
+      }
+    };
+
     fetchFromFirestore();
+    loadProgress();
+
+    // Set up real-time listener for progress updates
+    const unsubscribe = onSnapshot(
+      collection(db, "users", user.uid, "progress"),
+      (snapshot) => {
+        setState((prev) => {
+          const newSubjects = prev.subjects.map((subject) => {
+            const subjectTopics = subject.topics.map((topic) => {
+              const progressDoc = snapshot.docs.find(
+                (doc) => doc.data().subjectId === subject.id && doc.data().topicId === topic.id
+              );
+              if (progressDoc) {
+                return { ...topic, completed: progressDoc.data().completed || false };
+              }
+              return topic;
+            });
+            return { ...subject, topics: subjectTopics };
+          });
+          return { ...prev, subjects: newSubjects };
+        });
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   const overallProgress = computeOverallProgress();
@@ -311,6 +381,40 @@ const handleLogout = async () => {
       <main className={styles.mainContent}>
         {view === "dashboard" ? (
           <>
+            {/* Welcome Banner with AIM Profile */}
+            {aimProfile && (
+              <section className={`${styles.card} ${styles.welcomeBanner}`} style={{ marginBottom: "24px", padding: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+                  <div>
+                    <h2 className="font-display" style={{ fontSize: "24px", marginBottom: "8px" }}>
+                      Welcome, {userData?.fullName || currentUser?.displayName || "Student"}! 👋
+                    </h2>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                      <div style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "white",
+                        fontWeight: "600"
+                      }}>
+                        Goal: {AIM_LABELS[aimProfile.aim]?.title || aimProfile.aim} ({AIM_LABELS[aimProfile.aim]?.range || ""})
+                      </div>
+                      <span style={{ color: "rgba(148, 163, 184, 0.8)", fontSize: "14px" }}>
+                        {AIM_LABELS[aimProfile.aim]?.description || ""}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/landing")}
+                    className={`${styles.btn} ${styles.secondary}`}
+                    style={{ fontSize: "14px" }}
+                  >
+                    Edit Goal
+                  </button>
+                </div>
+              </section>
+            )}
+
             <section className={styles.summaryGrid}>
               <div className={`${styles.card} ${styles.summaryCard}`}>
                 <h2 className="font-display">Progress</h2>
@@ -359,7 +463,15 @@ const handleLogout = async () => {
                   </div>
                   <div>
                     <dt>Target Completion</dt>
-                    <dd>{state.profile.targetDate || "—"}</dd>
+                    <dd>
+                      {state.profile.targetDate
+                        ? new Date(state.profile.targetDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })
+                        : "—"}
+                    </dd>
                   </div>
                 </dl>
               </div>
@@ -413,13 +525,22 @@ const handleLogout = async () => {
                           </li>
                         ))}
                       </ul>
-                      <div className={styles.subjectActions}>
+                      <div className={styles.subjectActions} style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          className={`${styles.btn} ${styles.secondary}`}
+                          type="button"
+                          onClick={() => navigate(`/subject/${encodeURIComponent(subject.name)}`)}
+                          style={{ flex: 1 }}
+                        >
+                          📖 Study Materials
+                        </button>
                         <button
                           className={`${styles.btn} ${styles.primary}`}
                           type="button"
                           onClick={() => handleOpenQuiz(subject.id, subject.name)}
+                          style={{ flex: 1 }}
                         >
-                          {openQuizzes.has(subject.id) ? "Quiz Active" : "Open Quiz"}
+                          {openQuizzes.has(subject.id) ? "Quiz Active" : "📝 Open Quiz"}
                         </button>
                       </div>
                     </article>
@@ -465,6 +586,20 @@ const handleLogout = async () => {
       <footer className={styles.appFooter}>
         <small>Smart Study Planner</small>
       </footer>
+
+      {/* Quiz Modal */}
+      {selectedQuizSubject && (
+        <QuizModal
+          open={quizModalOpen}
+          onClose={() => {
+            setQuizModalOpen(false);
+            setSelectedQuizSubject(null);
+          }}
+          subjectId={selectedQuizSubject.id}
+          subjectName={selectedQuizSubject.name}
+          topics={selectedQuizSubject.topics}
+        />
+      )}
     </div>
   );
 };
