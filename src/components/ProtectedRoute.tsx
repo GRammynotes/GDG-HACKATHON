@@ -32,15 +32,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     return <Navigate to="/" replace />;
   }
 
-  // 🚫 If landing page and user already has AIM profile, redirect to dashboard
-  if (hasAimProfile && location.pathname === "/landing") {
-    return <Navigate to="/dashboard" replace />;
-  }
 
-  // 🚫 If dashboard and user doesn't have AIM profile, redirect to landing
-  if (!hasAimProfile && location.pathname === "/dashboard") {
-    return <Navigate to="/landing" replace />;
-  }
 
   return children;
 };

@@ -35,7 +35,7 @@ const StudyMaterials = () => {
                 const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
-                    
+
                     // Check for academicProfile first (from landing page)
                     if (userData.academicProfile?.subjects && Array.isArray(userData.academicProfile.subjects)) {
                         const { mapSubjectsToData } = await import("@/lib/subjectMapper");
@@ -44,7 +44,7 @@ const StudyMaterials = () => {
                         if (userSubjects.length > 0) {
                             setSelectedSubject(userSubjects[0].id);
                         }
-                    } 
+                    }
                     // Fallback to dashboardState
                     else if (userData.dashboardState?.subjects) {
                         const userSubjects = userData.dashboardState.subjects.map((s: any) => ({
@@ -56,7 +56,7 @@ const StudyMaterials = () => {
                         if (userSubjects.length > 0) {
                             setSelectedSubject(userSubjects[0].id);
                         }
-                    } 
+                    }
                     // If no subjects found, show message
                     else {
                         setSubjects([]);
@@ -126,8 +126,8 @@ const StudyMaterials = () => {
                                                 key={subject.id}
                                                 onClick={() => setSelectedSubject(subject.id)}
                                                 className={`w-full text-left p-3 rounded-lg transition-colors ${selectedSubject === subject.id
-                                                        ? "bg-primary text-primary-foreground"
-                                                        : "hover:bg-muted"
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "hover:bg-muted"
                                                     }`}
                                             >
                                                 <div className="font-medium">{subject.name}</div>
@@ -162,22 +162,48 @@ const StudyMaterials = () => {
                                             <CardContent>
                                                 <div className="space-y-4">
                                                     {currentSubject.topics.length > 0 ? (
-                                                        currentSubject.topics.map((topic, index) => (
-                                                            <div
-                                                                key={index}
-                                                                className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                                                            >
-                                                                <div className="flex items-start justify-between">
-                                                                    <div className="flex-1">
-                                                                        <h3 className="font-semibold mb-2">{topic}</h3>
-                                                                        <p className="text-sm text-muted-foreground">
-                                                                            Study materials for this topic will be available soon.
-                                                                        </p>
+                                                        currentSubject.topics.map((topic, index) => {
+                                                            const encodedSubject = encodeURIComponent(currentSubject.name);
+                                                            const encodedTopic = encodeURIComponent(topic);
+                                                            // Generic Links
+                                                            const notesUrl = `https://drive.google.com/drive/search?q=${encodedSubject}%20${encodedTopic}`;
+                                                            const videoUrl = `https://www.youtube.com/results?search_query=${encodedSubject}+${encodedTopic}+tutorial`;
+
+                                                            return (
+                                                                <div
+                                                                    key={index}
+                                                                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                                                                >
+                                                                    <div className="flex flex-col gap-3">
+                                                                        <div className="flex justify-between items-center">
+                                                                            <h3 className="font-semibold">{topic}</h3>
+                                                                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">Available</Badge>
+                                                                        </div>
+
+                                                                        <div className="flex gap-2 mt-2">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                                                onClick={() => window.open(notesUrl, "_blank", "noopener,noreferrer")}
+                                                                            >
+                                                                                <FileText className="h-4 w-4" />
+                                                                                Notes
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                                                                                onClick={() => window.open(videoUrl, "_blank", "noopener,noreferrer")}
+                                                                            >
+                                                                                <ExternalLink className="h-4 w-4" />
+                                                                                Video
+                                                                            </Button>
+                                                                        </div>
                                                                     </div>
-                                                                    <Badge variant="outline">Coming Soon</Badge>
                                                                 </div>
-                                                            </div>
-                                                        ))
+                                                            )
+                                                        })
                                                     ) : (
                                                         <div className="text-center py-12">
                                                             <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -203,13 +229,13 @@ const StudyMaterials = () => {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="space-y-4">
-                                                    <div className="p-6 border rounded-lg bg-muted/30">
-                                                        <p className="text-muted-foreground text-center">
-                                                            AI-generated study notes feature is coming soon. This will provide
-                                                            personalized study materials based on your progress and learning style.
-                                                        </p>
-                                                    </div>
+                                                <div className="p-6 border rounded-lg bg-muted/30 text-center">
+                                                    <p className="text-muted-foreground mb-4">
+                                                        To generate personalized AI notes and summaries, please visit the detailed Subject Study page.
+                                                    </p>
+                                                    <Button onClick={() => navigate(`/subject/${encodeURIComponent(currentSubject.name)}`)}>
+                                                        Go to Subject Page
+                                                    </Button>
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -229,16 +255,17 @@ const StudyMaterials = () => {
                                             <CardContent>
                                                 <div className="space-y-4">
                                                     <div className="p-4 border rounded-lg">
-                                                        <h3 className="font-semibold mb-2">Recommended Resources</h3>
-                                                        <ul className="space-y-2 text-sm text-muted-foreground">
-                                                            <li>• Course textbooks and reference materials</li>
-                                                            <li>• Online tutorials and video lectures</li>
-                                                            <li>• Practice problems and solutions</li>
-                                                            <li>• Research papers and articles</li>
-                                                        </ul>
-                                                        <p className="text-xs text-muted-foreground mt-4">
-                                                            External links will be added by your instructors.
-                                                        </p>
+                                                        <h3 className="font-semibold mb-2">General Resources</h3>
+                                                        <div className="flex flex-col gap-2">
+                                                            <a href={`https://www.google.com/search?q=${encodeURIComponent(currentSubject.name)}+study+guide`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                                                                <ExternalLink className="h-3 w-3" />
+                                                                Google Search: {currentSubject.name} Study Guides
+                                                            </a>
+                                                            <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(currentSubject.name)}+course`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                                                                <ExternalLink className="h-3 w-3" />
+                                                                YouTube: {currentSubject.name} Courses
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </CardContent>

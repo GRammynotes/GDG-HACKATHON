@@ -223,8 +223,8 @@ export function mapSubjectsToData(subjectNames: string[]): Subject[] {
       { id: "topic3", title: "Topic 3", completed: false },
     ],
     resources: {
-      notesUrl: "https://docs.google.com/document/u/0/", // Placeholder
-      youtubeUrl: "https://www.youtube.com/results?search_query=" + encodeURIComponent(name + " one shot"),
+      notesUrl: "https://drive.google.com/drive/u/0/folders/1w5aD4y4aFqgJ2z6X4weG5yHq7f8j3kL_", // Default Drive Folder
+      youtubeUrl: "https://www.youtube.com/results?search_query=" + encodeURIComponent(name + " full course"),
     }
   }));
 }

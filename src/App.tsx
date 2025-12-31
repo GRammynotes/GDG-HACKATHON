@@ -14,6 +14,7 @@ import StudyMaterials from "./pages/StudyMaterials";
 import SubjectStudy from "./pages/SubjectStudy";
 import NotFound from "./pages/NotFound";
 import SplashScreen from "./components/SplashScreen";
+import MainLayout from "./components/MainLayout";
 
 const queryClient = new QueryClient();
 
@@ -45,7 +46,9 @@ const App = () => {
                 path="/landing"
                 element={
                   <ProtectedRoute>
-                    <LandingPage />
+                    <MainLayout>
+                      <LandingPage />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />
@@ -53,7 +56,9 @@ const App = () => {
                 path="/onboarding"
                 element={
                   <ProtectedRoute>
-                    <Onboarding />
+                    <MainLayout>
+                      <Onboarding />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />
@@ -61,7 +66,9 @@ const App = () => {
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <MainLayout>
+                      <Dashboard />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />
@@ -69,7 +76,9 @@ const App = () => {
                 path="/materials"
                 element={
                   <ProtectedRoute>
-                    <StudyMaterials />
+                    <MainLayout>
+                      <StudyMaterials />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />
@@ -77,7 +86,9 @@ const App = () => {
                 path="/subject/:subjectName"
                 element={
                   <ProtectedRoute>
-                    <SubjectStudy />
+                    <MainLayout>
+                      <SubjectStudy />
+                    </MainLayout>
                   </ProtectedRoute>
                 }
               />

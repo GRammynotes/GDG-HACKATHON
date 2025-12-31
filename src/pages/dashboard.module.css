@@ -392,32 +392,37 @@
 }
 
 .btn.primary {
-  background: linear-gradient(135deg, #FF724C, #FF5A2E);
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%); /* Brighter Coral */
   color: white;
-  box-shadow: 0 8px 16px rgba(255, 114, 76, 0.3);
-  font-weight: 600;
-  font-size: 12px;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+  font-weight: 700;
+  font-size: 13px;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 8px 16px;
 }
 
 .btn.primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 20px rgba(255, 114, 76, 0.4);
-}
-
-.btn.primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  background: linear-gradient(135deg, #FF8C42 0%, #FF6B35 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
 }
 
 .btn.secondary {
-  background: rgba(31, 41, 55, 0.95);
-  color: var(--text-main);
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: linear-gradient(135deg, #007BFF 0%, #0056B3 100%); /* Bright Blue */
+  color: white;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 107, 255, 0.3);
+  text-transform: uppercase;
+  padding: 8px 16px;
 }
 
 .btn.secondary:hover {
-  background: rgba(55, 65, 81, 0.95);
+  background: linear-gradient(135deg, #0056B3 0%, #003d82 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 107, 255, 0.4);
 }
 
 .btn.danger {

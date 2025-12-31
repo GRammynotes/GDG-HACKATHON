@@ -233,29 +233,33 @@ Format the response as a well-structured study guide with sections and bullet po
     const totalTopics = topics.length;
     const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
-    // Resource URLs mapping - can be moved to Firestore later
-    const getResourceUrl = (subjectName: string, topicTitle: string, resourceType: string): string | null => {
+    // Generic Resource URL generator
+    const getResourceUrl = (subjectName: string, topicTitle: string, resourceType: string): string => {
+        const encodedSubject = encodeURIComponent(subjectName);
+        const encodedTopic = encodeURIComponent(topicTitle);
+
+        // Specific Overrides (if any)
         const resourceMap: Record<string, Record<string, Record<string, string>>> = {
             "Microprocessor and Microcontroller": {
-                "Architecture & Instruction Set": {
-                    "Concept Notes": "https://drive.google.com/drive/folders/1example",
-                    "Video Tutorial": "https://www.youtube.com/results?search_query=microprocessor+architecture+instruction+set",
-                    "Practice Problems": "https://www.geeksforgeeks.org/microprocessor-8085-architecture/",
-                },
-                "Interfacing & Peripherals": {
-                    "Concept Notes": "https://drive.google.com/drive/folders/2example",
-                    "Video Tutorial": "https://www.youtube.com/results?search_query=microprocessor+interfacing+peripherals",
-                    "Practice Problems": "https://www.tutorialspoint.com/microprocessor/microprocessor_interfacing.htm",
-                },
-                "Assembly & C Programming": {
-                    "Concept Notes": "https://drive.google.com/drive/folders/3example",
-                    "Video Tutorial": "https://www.youtube.com/results?search_query=assembly+language+programming+microprocessor",
-                    "Practice Problems": "https://www.geeksforgeeks.org/introduction-of-assembler/",
-                },
-            },
+                // Keep existing specific ones if valuable, or rely on generics
+            }
         };
+        const specific = resourceMap[subjectName]?.[topicTitle]?.[resourceType];
+        if (specific) return specific;
 
-        return resourceMap[subjectName]?.[topicTitle]?.[resourceType] || null;
+        // Generic Fallbacks
+        if (resourceType === "Concept Notes") {
+            // Link to a search in Drive or a specific folder if known.
+            // Using a placeholder Folder Search for now as requested by user plan
+            return `https://drive.google.com/drive/search?q=${encodedSubject}%20${encodedTopic}`;
+        }
+        if (resourceType === "Video Tutorial") {
+            return `https://www.youtube.com/results?search_query=${encodedSubject}+${encodedTopic}+tutorial`;
+        }
+        if (resourceType === "Practice Problems") {
+            return `https://www.google.com/search?q=${encodedSubject}+${encodedTopic}+practice+problems+geeksforgeeks`;
+        }
+        return "#";
     };
 
     const handleTopicToggle = async (topicId: string, currentCompleted: boolean) => {
@@ -297,18 +301,13 @@ Format the response as a well-structured study guide with sections and bullet po
 
     const handleResourceClick = (resourceType: string, topicTitle: string) => {
         const url = getResourceUrl(decodedSubjectName, topicTitle, resourceType);
-
-        if (url) {
-            // Open in new tab
+        if (url && url !== "#") {
             window.open(url, "_blank", "noopener,noreferrer");
             toast.success(`Opening ${resourceType}`, {
-                description: `Opening ${resourceType} for "${topicTitle}" in a new tab`,
+                description: `Opening resources for "${topicTitle}"`,
             });
         } else {
-            // Fallback for subjects/topics without URLs yet
-            toast.info(`${resourceType} for "${topicTitle}"`, {
-                description: "Resource link will be available soon. Check back later!",
-            });
+            toast.error("Resource not available");
         }
     };
 
@@ -333,14 +332,14 @@ Format the response as a well-structured study guide with sections and bullet po
                 </div>
 
                 {/* AI Summary Section */}
-                <Card className="mb-6">
+                <Card className="mb-6 border-primary/20 bg-primary/5">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-primary">
                             <BookOpen className="h-5 w-5" />
                             AI Study Summary
                             {aimProfile && (
-                                <Badge variant="secondary" className="ml-2">
-                                    For {AIM_LABELS[aimProfile.aim]?.title || aimProfile.aim} Goal
+                                <Badge variant="secondary" className="ml-2 bg-background/50">
+                                    Goal: {AIM_LABELS[aimProfile.aim]?.title || aimProfile.aim}
                                 </Badge>
                             )}
                         </CardTitle>
@@ -364,7 +363,7 @@ Format the response as a well-structured study guide with sections and bullet po
                             </div>
                         ) : (
                             <div className="text-center py-12">
-                                <p className="text-muted-foreground mb-4">AI summary will be generated here</p>
+                                <p className="text-muted-foreground mb-4">Click below to get a tailored study strategy.</p>
                                 <Button onClick={generateAISummary}>Generate Summary</Button>
                             </div>
                         )}
@@ -378,7 +377,7 @@ Format the response as a well-structured study guide with sections and bullet po
                             <FileText className="h-5 w-5" />
                             Topics ({totalTopics} total)
                         </CardTitle>
-                        <CardDescription>Study materials and resources for each topic</CardDescription>
+                        <CardDescription>Access study materials for each unit.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {topics.length > 0 ? (
@@ -386,73 +385,70 @@ Format the response as a well-structured study guide with sections and bullet po
                                 {topics.map((topic: any, index: number) => (
                                     <div
                                         key={topic.id || index}
-                                        className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                                        className="p-4 border rounded-lg hover:bg-muted/30 transition-shadow hover:shadow-sm bg-card"
                                     >
-                                        <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-start justify-between mb-4">
                                             <div className="flex items-center gap-3">
                                                 <input
                                                     type="checkbox"
                                                     checked={topic.completed || false}
                                                     onChange={(e) => handleTopicToggle(topic.id, topic.completed)}
-                                                    className="mt-1 w-4 h-4 cursor-pointer"
+                                                    className="mt-1 w-5 h-5 accent-green-500 cursor-pointer"
                                                 />
-                                                <h3 className="font-semibold">{topic.title}</h3>
+                                                <h3 className="font-semibold text-lg">{topic.title}</h3>
                                             </div>
                                             {topic.completed && (
-                                                <Badge variant="default" className="bg-green-500">
+                                                <Badge variant="default" className="bg-green-500 hover:bg-green-600">
                                                     Completed
                                                 </Badge>
                                             )}
                                         </div>
-                                        <div className="ml-8 space-y-2">
+                                        <div className="ml-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             {(() => {
-                                                const hasNotes = getResourceUrl(decodedSubjectName, topic.title, "Concept Notes");
-                                                const hasVideo = getResourceUrl(decodedSubjectName, topic.title, "Video Tutorial");
-                                                const hasPractice = getResourceUrl(decodedSubjectName, topic.title, "Practice Problems");
+                                                const notesUrl = getResourceUrl(decodedSubjectName, topic.title, "Concept Notes");
+                                                const videoUrl = getResourceUrl(decodedSubjectName, topic.title, "Video Tutorial");
+                                                const practiceUrl = getResourceUrl(decodedSubjectName, topic.title, "Practice Problems");
 
                                                 return (
                                                     <>
                                                         <button
                                                             onClick={() => handleResourceClick("Concept Notes", topic.title)}
-                                                            className={`flex items-center gap-2 text-sm transition-colors w-full text-left p-2 rounded hover:bg-muted/30 ${hasNotes ? "text-foreground hover:text-primary cursor-pointer" : "text-muted-foreground cursor-not-allowed opacity-60"
-                                                                }`}
-                                                            disabled={!hasNotes}
+                                                            className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/50 hover:bg-blue-100/50 border-blue-200 text-blue-700 transition-all group"
                                                         >
-                                                            <FileText className="h-4 w-4" />
-                                                            <span>Concept Notes</span>
-                                                            <Badge variant={hasNotes ? "default" : "outline"} className="ml-auto">
-                                                                {hasNotes ? "Available" : "Coming Soon"}
+                                                            <div className="flex items-center gap-2">
+                                                                <FileText className="h-4 w-4" />
+                                                                <span className="font-medium text-sm">Notes</span>
+                                                            </div>
+                                                            <Badge variant="outline" className="bg-white/50 text-[10px] group-hover:bg-blue-500 group-hover:text-white transition-colors border-blue-200">
+                                                                Available
                                                             </Badge>
                                                         </button>
+
                                                         <button
                                                             onClick={() => handleResourceClick("Video Tutorial", topic.title)}
-                                                            className={`flex items-center gap-2 text-sm transition-colors w-full text-left p-2 rounded hover:bg-muted/30 ${hasVideo ? "text-foreground hover:text-primary cursor-pointer" : "text-muted-foreground cursor-not-allowed opacity-60"
-                                                                }`}
-                                                            disabled={!hasVideo}
+                                                            className="flex items-center justify-between p-3 rounded-lg border bg-red-50/50 hover:bg-red-100/50 border-red-200 text-red-700 transition-all group"
                                                         >
-                                                            <Video className="h-4 w-4" />
-                                                            <span>Video Tutorial</span>
-                                                            <Badge variant={hasVideo ? "default" : "outline"} className="ml-auto">
-                                                                {hasVideo ? "Available" : "Coming Soon"}
+                                                            <div className="flex items-center gap-2">
+                                                                <Video className="h-4 w-4" />
+                                                                <span className="font-medium text-sm">Video</span>
+                                                            </div>
+                                                            <Badge variant="outline" className="bg-white/50 text-[10px] group-hover:bg-red-500 group-hover:text-white transition-colors border-red-200">
+                                                                Watch
                                                             </Badge>
                                                         </button>
+
                                                         <button
                                                             onClick={() => handleResourceClick("Practice Problems", topic.title)}
-                                                            className={`flex items-center gap-2 text-sm transition-colors w-full text-left p-2 rounded hover:bg-muted/30 ${hasPractice ? "text-foreground hover:text-primary cursor-pointer" : "text-muted-foreground cursor-not-allowed opacity-60"
-                                                                }`}
-                                                            disabled={!hasPractice}
+                                                            className="flex items-center justify-between p-3 rounded-lg border bg-green-50/50 hover:bg-green-100/50 border-green-200 text-green-700 transition-all group"
                                                         >
-                                                            <ExternalLink className="h-4 w-4" />
-                                                            <span>Practice Problems</span>
-                                                            <Badge variant={hasPractice ? "default" : "outline"} className="ml-auto">
-                                                                {hasPractice ? "Available" : "Coming Soon"}
+                                                            <div className="flex items-center gap-2">
+                                                                <ExternalLink className="h-4 w-4" />
+                                                                <span className="font-medium text-sm">Practice</span>
+                                                            </div>
+                                                            <Badge variant="outline" className="bg-white/50 text-[10px] group-hover:bg-green-500 group-hover:text-white transition-colors border-green-200">
+                                                                Solve
                                                             </Badge>
                                                         </button>
-                                                        {!hasNotes && !hasVideo && !hasPractice && (
-                                                            <p className="text-xs text-muted-foreground mt-2 px-2">
-                                                                Resource links for this topic will be available soon.
-                                                            </p>
-                                                        )}
                                                     </>
                                                 );
                                             })()}
@@ -481,7 +477,7 @@ Format the response as a well-structured study guide with sections and bullet po
                                 }));
                             }, 100);
                         }}
-                        className="flex-1"
+                        className="flex-1 bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white shadow-lg shadow-orange-500/20"
                     >
                         📝 Start Quiz
                     </Button>

@@ -268,12 +268,12 @@ const Dashboard = () => {
           // Load AIM profile
           if (data.academicProfile) {
             setAimProfile(data.academicProfile);
-            
+
             // Update dashboard state with academicProfile data
             const { mapSubjectsToData, getYearLabel, getSemesterLabel } = await import("@/lib/subjectMapper");
-            
+
             const subjects = mapSubjectsToData(data.academicProfile.subjects || []);
-            
+
             setState(prev => ({
               ...prev,
               profile: {
@@ -364,15 +364,8 @@ const Dashboard = () => {
 
   return (
     <div id="legacy-dashboard-root" className={styles.appShell}>
-      <header className={styles.topbar}>
-        <div className={styles.brand}>
-          <span className={styles.brandLogo}>SS</span>
-          <div className={styles.brandText}>
-            <h1 className="font-display">Smart Study Planner</h1>
-            <p className={styles.brandSubtitle}>Dashboard</p>
-          </div>
-        </div>
-        <nav className={styles.navTabs}>
+      <div className={styles.topbar} style={{ justifyContent: 'center', background: 'transparent', boxShadow: 'none', border: 'none', padding: '0 0 24px 0' }}>
+        <nav className={styles.navTabs} style={{ background: 'white', padding: '4px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
           <button
             id="tab-dashboard"
             className={`${styles.navTab} ${view === "dashboard" ? styles.active : ""}`}
@@ -387,15 +380,8 @@ const Dashboard = () => {
           >
             Profile
           </button>
-          <button
-            onClick={handleLogout}
-            className={styles.navTab}
-            style={{ color: "#ef4444" }}
-          >
-            Logout
-          </button>
         </nav>
-      </header>
+      </div>
 
       <main className={styles.mainContent}>
         {view === "dashboard" ? (
