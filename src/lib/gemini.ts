@@ -2,7 +2,7 @@
  * Gemini AI API Service for Quiz Generation
  */
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyB9r7oNZQYPCgLoXgjdo5TWUrRARQKYdow";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyCVrw_d9drp9ZekZula22s_26N-fJXyxdY";
 
 // Try gemini-1.5-flash first, fallback to gemini-pro if it fails
 const getGeminiUrl = (model: string) =>
@@ -20,6 +20,73 @@ export interface QuizData {
   subject: string;
   topics: string[];
   generatedAt: string;
+}
+
+/**
+ * Generate a short summary for a subject based on the user's aim.
+ */
+export async function generateSubjectSummary(
+  subjectName: string,
+  aim: string
+): Promise<string> {
+   if (!GEMINI_API_KEY) {
+    throw new Error("Gemini API key is not configured");
+  }
+
+  const prompt = `Provide a concise 3-sentence summary of the subject "${subjectName}" tailored for a student aiming for "${aim}" performance. Include 1 key tip for success.`;
+
+    const models = ["gemini-1.5-flash", "gemini-pro"];
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    try {
+      const response = await fetch(getGeminiUrl(model), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 256,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+         if (response.status === 404 || response.status === 400) {
+          lastError = new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+          continue; 
+        }
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+       if (!textContent) {
+        throw new Error("No content received from Gemini API");
+      }
+      return textContent.trim();
+
+    } catch (error) {
+       if (model === models[models.length - 1]) {
+           console.error("Error generating summary with all models:", error);
+           throw lastError || error;
+       }
+       lastError = error instanceof Error ? error : new Error(String(error));
+       continue;
+    }
+  }
+  return "Unable to generate summary at this time.";
 }
 
 /**

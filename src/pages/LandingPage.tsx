@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Target, Sparkles, ArrowRight, BookOpen, GraduationCap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Target, Sparkles, ArrowRight, BookOpen, GraduationCap, PlayCircle, FileText, BrainCircuit, Grip, CheckCircle2, Trophy, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -9,6 +9,11 @@ import AimCard from '@/components/AimCard';
 import SubjectChip from '@/components/SubjectChip';
 import SelectField from '@/components/SelectField';
 import SummaryPanel from '@/components/SummaryPanel';
+import { useAuth } from '@/contexts/AuthContext';
+import { mapSubjectsToData, Subject } from '@/lib/subjectMapper';
+import { generateSubjectSummary } from '@/lib/gemini';
+
+// --- Types ---
 
 type AimLevel = 'passing' | 'below-average' | 'average' | 'above-average' | 'topper';
 type Year = 1 | 2 | 3 | 4;
@@ -93,16 +98,142 @@ const SUBJECT_MAP: Record<CourseId, Partial<Record<Year, Partial<Record<Semester
     },
 };
 
+// --- Components ---
+
+const RoadmapStep = ({ number, title, desc, icon: Icon, isLast }: { number: number, title: string, desc: string, icon: any, isLast?: boolean }) => (
+    <div className="flex gap-4 relative">
+        {!isLast && <div className="absolute left-[19px] top-10 bottom-[-24px] w-0.5 bg-gradient-to-b from-primary/30 to-transparent" />}
+        <div className="relative z-10 flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary/20 bg-background shadow-[0_0_15px_rgba(59,130,246,0.2)]`}>
+                <Icon className="w-5 h-5 text-primary" />
+            </div>
+        </div>
+        <div className="pb-8 pt-1">
+            <h3 className="font-semibold text-lg text-foreground">{title}</h3>
+            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+        </div>
+    </div>
+);
+
+const SubjectCard = ({ subject, aim, delay }: { subject: Subject; aim: AimLevel; delay: number }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [loadingSummary, setLoadingSummary] = useState(false);
+
+    const handleGenerateSummary = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (summary) return;
+        setLoadingSummary(true);
+        try {
+            const aiSummary = await generateSubjectSummary(subject.name, aim);
+            setSummary(aiSummary);
+        } catch (err) {
+            toast.error("Failed to get AI summary");
+        } finally {
+            setLoadingSummary(false);
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay }}
+            className="group relative"
+        >
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className={`glass-panel p-5 cursor-pointer transition-all duration-300 hover:border-primary/30 ${isOpen ? 'ring-2 ring-primary/20' : ''}`}
+            >
+                <div className="flex items-start justify-between">
+                    <div className="flex gap-3">
+                        <div className={`mt-1 h-2 w-2 rounded-full ${subject.topics.every(t => t.completed) ? 'bg-green-500' : 'bg-primary'}`} />
+                        <div>
+                            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                {subject.name}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1">{subject.topics.length} topics</p>
+                        </div>
+                    </div>
+                    <div className="bg-secondary/50 p-2 rounded-lg text-muted-foreground group-hover:text-primary transition-colors">
+                        {isOpen ? <BrainCircuit className="w-4 h-4" /> : <Grip className="w-4 h-4" />}
+                    </div>
+                </div>
+
+                <AnimatePresence>
+                    {isOpen && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="pt-4 mt-4 border-t border-border/50 space-y-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <a
+                                        href={subject.resources?.notesUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors text-sm font-medium border border-blue-500/20"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <FileText className="w-4 h-4" /> Notes (Drive)
+                                    </a>
+                                    <a
+                                        href={subject.resources?.youtubeUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors text-sm font-medium border border-red-500/20"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <PlayCircle className="w-4 h-4" /> Tutorials (YT)
+                                    </a>
+                                </div>
+
+                                <div className="bg-secondary/30 rounded-lg p-4 border border-border/50">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-purple-400">
+                                            <Sparkles className="w-4 h-4" /> AI Insight
+                                        </div>
+                                        {!summary && (
+                                            <button
+                                                onClick={handleGenerateSummary}
+                                                disabled={loadingSummary}
+                                                className="text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 px-2 py-1 rounded transition-colors"
+                                            >
+                                                {loadingSummary ? "Thinking..." : "Generate Summary"}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {summary || "Click generating summary to get a quick overview and study tips for this subject tailored to your goal."}
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </motion.div>
+    );
+};
+
+// --- Main Page Component ---
+
 const LandingPage = () => {
     const navigate = useNavigate();
+    // User Goals State
     const [course, setCourse] = useState<CourseId>('btech-cse');
     const [year, setYear] = useState<Year>(1);
     const [semester, setSemester] = useState<Semester>(1);
     const [aim, setAim] = useState<AimLevel>('above-average');
     const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const { userData, refreshUserData } = useAuth();
+    const hasProfile = !!userData?.academicProfile;
+
+    // Derived States
     const availableSubjects = useMemo(() => {
         const byCourse = SUBJECT_MAP[course];
         const byYear = byCourse?.[year];
@@ -110,6 +241,7 @@ const LandingPage = () => {
         return list;
     }, [course, year, semester]);
 
+    // Handlers
     const handleToggleSubject = (subject: string) => {
         setSelectedSubjects((prev) =>
             prev.includes(subject) ? prev.filter((s) => s !== subject) : [...prev, subject]
@@ -126,7 +258,6 @@ const LandingPage = () => {
             subjects: selectedSubjects.length ? selectedSubjects : availableSubjects,
             updatedAt: new Date()
         };
-        console.log('Landing payload:', payload);
 
         try {
             const user = auth.currentUser;
@@ -135,90 +266,169 @@ const LandingPage = () => {
                     academicProfile: payload
                 }, { merge: true });
 
-                // Show processing animation for a bit for UX
+                // Refresh context
+                await refreshUserData();
+
+                // Show processing animation
                 setTimeout(() => {
-                    toast.success('Goal saved successfully!', {
-                        description: 'Your AIM profile has been configured and saved to the cloud.',
+                    toast.success('Roadmap generated!', {
+                        description: 'Your personalized study plan is ready.',
                     });
-                    navigate('/materials');
-                }, 2000);
-            } else {
-                console.warn("No user logged in, saving to local storage only via flow");
-                // Fallback flow or just redirect if auth is optional (though it seems required)
-                setTimeout(() => {
-                    toast.success('Goal saved locally!', {
-                        description: 'Redirecting to Study Materials.',
-                    });
-                    navigate('/materials');
+                    setIsProcessing(false);
+                    // No need to navigate, state change will trigger re-render of this page to "Roadmap Mode"
                 }, 2000);
             }
         } catch (error) {
             console.error("Error saving profile:", error);
-            toast.error("Failed to save profile", {
-                description: "There was an error saving your data to the cloud."
-            });
+            toast.error("Failed to save profile");
             setIsProcessing(false);
         }
     };
 
-    const aimMeta = AIM_LABELS[aim];
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 },
-        },
-    };
-
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0 },
-    };
-
+    // --- Loading State ---
     if (isProcessing) {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent -z-10" />
-                {/* Ambient glows */}
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-
                 <div className="text-center py-12 space-y-8 relative z-10">
                     <div className="relative w-24 h-24 mx-auto">
                         <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" />
-                        <div className="absolute inset-2 rounded-full border-2 border-purple-500/40 animate-ping" style={{ animationDelay: "0.2s" }} />
-                        <div className="absolute inset-4 rounded-full border-2 border-teal-500/50 animate-ping" style={{ animationDelay: "0.4s" }} />
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Sparkles className="w-10 h-10 text-amber-400 animate-pulse" />
                         </div>
                     </div>
                     <div className="space-y-3">
                         <h2 className="text-2xl font-display font-semibold text-gradient animate-fade-up">
-                            Personalising content according to you…
+                            Generating your Roadmap...
                         </h2>
-                        <p className="text-sm text-muted-foreground animate-fade-up" style={{ animationDelay: "0.1s" }}>
-                            Our AI is crafting your unique study path based on your <strong>{aimMeta.title}</strong> goal.
-                        </p>
                     </div>
                 </div>
             </div>
         );
     }
 
+    // --- VIEW: ROADMAP DASHBOARD (If Profile Exists) ---
+    if (hasProfile) {
+        const profile = userData.academicProfile;
+        const currentAim = AIM_LABELS[profile.aim as AimLevel];
+        const userSubjects = mapSubjectsToData(profile.subjects);
+
+        return (
+            <div className="min-h-screen bg-background relative selection:bg-primary/20">
+                <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
+
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                    {/* Header Section */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight">
+                                    Hey, <span className="text-gradient capitalize">{userData.fullName?.split(' ')[0] || 'Scholar'}</span>
+                                </h1>
+                                <span className="px-3 py-1 bg-secondary rounded-full text-xs font-medium text-muted-foreground border border-border">
+                                    {profile.course.toUpperCase()} · Year {profile.year}
+                                </span>
+                            </div>
+                            <p className="text-muted-foreground max-w-lg">
+                                Your roadmap to hit <span className={`font-semibold bg-clip-text text-transparent bg-gradient-to-r ${currentAim.color}`}>{currentAim.title}</span> status is ready.
+                            </p>
+                        </div>
+
+                        <div className="glass-panel p-4 flex items-center gap-4 min-w-[200px]">
+                            <div className={`p-3 rounded-xl bg-gradient-to-br ${currentAim.color} bg-opacity-10 text-white shadow-lg`}>
+                                <Trophy className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Current Goal</p>
+                                <p className="font-bold text-lg">{currentAim.title}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                        {/* LEFT: The Path (Roadmap) */}
+                        <div className="lg:col-span-1 space-y-6">
+                            <h2 className="text-xl font-semibold flex items-center gap-2">
+                                <Target className="w-5 h-5 text-primary" /> Strategy Path
+                            </h2>
+                            <div className="glass-panel p-6">
+                                <RoadmapStep
+                                    number={1}
+                                    title="Foundation First"
+                                    desc="Skim through the AI summaries for all subjects to get the big picture this week."
+                                    icon={BrainCircuit}
+                                />
+                                <RoadmapStep
+                                    number={2}
+                                    title="Deep Dive Resources"
+                                    desc="Use the provided Drive notes for unit-wise preparation. Stick to one source."
+                                    icon={FileText}
+                                />
+                                <RoadmapStep
+                                    number={3}
+                                    title="Video Reinforcement"
+                                    desc="Watch the 'One Shot' tutorials for topics you find confusing."
+                                    icon={PlayCircle}
+                                />
+                                <RoadmapStep
+                                    number={4}
+                                    title="Final Polish"
+                                    desc="Solve previous year questions (aim for 5 years) to secure that CGPA."
+                                    icon={CheckCircle2}
+                                    isLast
+                                />
+                            </div>
+
+                            <div className="glass-panel p-6 bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/10">
+                                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-primary" /> Daily Tip
+                                </h3>
+                                <p className="text-sm text-muted-foreground italic">
+                                    "Consistency beats intensity. 30 minutes of focused study daily is better than a 10-hour binge on Sunday."
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Subjects Grid */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <h2 className="text-xl font-semibold flex items-center gap-2">
+                                <BookOpen className="w-5 h-5 text-primary" /> Your Subjects ({userSubjects.length})
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {userSubjects.map((subject, idx) => (
+                                    <SubjectCard
+                                        key={subject.id}
+                                        subject={subject}
+                                        aim={profile.aim as AimLevel}
+                                        delay={idx * 0.1}
+                                    />
+                                ))}
+                            </div>
+
+                            {userSubjects.length === 0 && (
+                                <div className="text-center py-12 glass-panel border-dashed">
+                                    <p className="text-muted-foreground">No subjects found. Please update your profile settings.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --- VIEW: GOAL SETTING (If No Profile) ---
+    const aimMeta = AIM_LABELS[aim];
+
     return (
         <div className="min-h-screen bg-background">
-            {/* Subtle background gradient */}
             <div className="fixed inset-0 -z-10 bg-gradient-radial from-primary/5 via-transparent to-transparent" />
 
-            <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
+            <div
                 className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-12 pt-8 sm:px-6 lg:px-8"
             >
                 {/* Header */}
-                <motion.header variants={itemVariants} className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+                <header className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5">
                             <Target className="h-4 w-4 text-primary" />
@@ -233,10 +443,7 @@ const LandingPage = () => {
                         </p>
                     </div>
 
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3 }}
+                    <div
                         className="glass-panel w-full max-w-xs p-5 sm:w-auto"
                     >
                         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -247,13 +454,13 @@ const LandingPage = () => {
                             <span className="ml-2 text-sm font-medium text-muted-foreground">({aimMeta.range})</span>
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{aimMeta.description}</p>
-                    </motion.div>
-                </motion.header>
+                    </div>
+                </header>
 
                 {/* Main content */}
                 <main className="grid gap-8 lg:grid-cols-[1.6fr,1fr]">
                     {/* Left: Goal-setting form */}
-                    <motion.section variants={itemVariants} className="space-y-6">
+                    <section className="space-y-6">
                         <div className="glass-panel space-y-6 p-6 sm:p-8">
                             {/* Academic context */}
                             <div>
@@ -261,10 +468,6 @@ const LandingPage = () => {
                                     <GraduationCap className="h-5 w-5 text-primary" />
                                     <h2 className="section-title text-base">Academic context</h2>
                                 </div>
-                                <p className="section-subtitle mt-1">
-                                    This helps AimSet fetch the right semester and subject structure for you.
-                                </p>
-
                                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
                                     <SelectField
                                         label="Degree / Course"
@@ -368,7 +571,7 @@ const LandingPage = () => {
                             <div className="divider flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="text-xs text-muted-foreground max-w-md">
                                     <p>
-                                        When you continue, AimSet will create a profile instance and redirect you to the Study Material page.
+                                        When you continue, AimSet will create a profile instance and redirect you to the Roadmap.
                                     </p>
                                 </div>
                                 <motion.button
@@ -383,10 +586,10 @@ const LandingPage = () => {
                                 </motion.button>
                             </div>
                         </div>
-                    </motion.section>
+                    </section>
 
                     {/* Right: Summary panel */}
-                    <motion.section variants={itemVariants} className="space-y-6">
+                    <section className="space-y-6">
                         <SummaryPanel
                             course={COURSES[course]?.label ?? '—'}
                             year={YEAR_OPTIONS.find((y) => y.value === year)?.label ?? '—'}
@@ -396,12 +599,7 @@ const LandingPage = () => {
                             subjects={selectedSubjects.length ? selectedSubjects : availableSubjects}
                         />
 
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            className="glass-panel p-5 sm:p-6"
-                        >
+                        <div className="glass-panel p-5 sm:p-6">
                             <h2 className="section-title flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-primary" />
                                 Quick walkthrough
@@ -410,12 +608,12 @@ const LandingPage = () => {
                                 <li>Select your course, year and semester.</li>
                                 <li>Watch subjects auto-appear — toggle to match your load.</li>
                                 <li>Click through AIM levels and see how targets change.</li>
-                                <li>Hit "Save AIM & Continue" to seed your dashboard.</li>
+                                <li>Hit "Save AIM & Continue" to see your personal roadmap.</li>
                             </ol>
-                        </motion.div>
-                    </motion.section>
+                        </div>
+                    </section>
                 </main>
-            </motion.div>
+            </div>
         </div>
     );
 };

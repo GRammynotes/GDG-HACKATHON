@@ -13,6 +13,10 @@ export interface Subject {
   id: string;
   name: string;
   topics: Topic[];
+  resources?: {
+    notesUrl?: string; // e.g. Drive link
+    youtubeUrl?: string; // One shot video
+  };
 }
 
 // Topic mappings for different subjects
@@ -159,11 +163,7 @@ const SUBJECT_TOPICS_MAP: Record<string, Topic[]> = {
     { id: "circuits", title: "Digital Circuits", completed: false },
     { id: "design", title: "Circuit Design", completed: false },
   ],
-  "Operating Systems": [
-    { id: "processes", title: "Process Management", completed: false },
-    { id: "memory", title: "Memory Management", completed: false },
-    { id: "files", title: "File Systems", completed: false },
-  ],
+
   "Accounting Fundamentals": [
     { id: "basics", title: "Accounting Basics", completed: false },
     { id: "financial", title: "Financial Statements", completed: false },
@@ -206,7 +206,7 @@ export function getSubjectId(subjectName: string): string {
     "Digital Electronics": "digital-elec",
     "Accounting Fundamentals": "accounting",
   };
-  
+
   return idMap[subjectName] || subjectName.toLowerCase().replace(/\s+/g, "-");
 }
 
@@ -222,6 +222,10 @@ export function mapSubjectsToData(subjectNames: string[]): Subject[] {
       { id: "topic2", title: "Topic 2", completed: false },
       { id: "topic3", title: "Topic 3", completed: false },
     ],
+    resources: {
+      notesUrl: "https://docs.google.com/document/u/0/", // Placeholder
+      youtubeUrl: "https://www.youtube.com/results?search_query=" + encodeURIComponent(name + " one shot"),
+    }
   }));
 }
 

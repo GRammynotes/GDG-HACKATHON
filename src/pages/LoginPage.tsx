@@ -35,13 +35,8 @@ const LoginPage = () => {
   useEffect(() => {
     if (!authLoading && currentUser) {
       // Check if user has AIM profile (academicProfile)
-      if (userData?.academicProfile) {
-        // User has set their goal, go to personalized dashboard
-        navigate("/dashboard");
-      } else {
-        // User needs to set their goal, go to landing page
-        navigate("/landing");
-      }
+      // Always go to landing page which now handles both goal setting and dashboard roadmap
+      navigate("/landing");
     }
   }, [currentUser, userData, navigate, authLoading]);
 
