@@ -268,10 +268,29 @@ const Dashboard = () => {
           // Load AIM profile
           if (data.academicProfile) {
             setAimProfile(data.academicProfile);
+            
+            // Update dashboard state with academicProfile data
+            const { mapSubjectsToData, getYearLabel, getSemesterLabel } = await import("@/lib/subjectMapper");
+            
+            const subjects = mapSubjectsToData(data.academicProfile.subjects || []);
+            
+            setState(prev => ({
+              ...prev,
+              profile: {
+                ...prev.profile,
+                year: getYearLabel(data.academicProfile.year),
+                semester: getSemesterLabel(data.academicProfile.semester),
+                subjectsLabel: data.academicProfile.subjects?.join(", ") || prev.profile.subjectsLabel,
+                name: data.fullName || prev.profile.name,
+                email: user.email || prev.profile.email,
+                department: data.academicProfile.course === "btech-cse" ? "COMPS" : "IT",
+              },
+              subjects: subjects.length > 0 ? subjects : prev.subjects,
+            }));
           }
 
-          // Load dashboard state
-          if (data.dashboardState) {
+          // Load dashboard state (fallback)
+          if (data.dashboardState && !data.academicProfile) {
             // Merge remote state
             setState(prev => ({
               ...prev,

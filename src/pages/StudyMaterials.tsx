@@ -31,12 +31,22 @@ const StudyMaterials = () => {
             }
 
             try {
-                // Load user's subjects from their profile
+                // Load user's subjects from their academicProfile
                 const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
-                    // Try to get subjects from dashboard state or use default
-                    if (userData.dashboardState?.subjects) {
+                    
+                    // Check for academicProfile first (from landing page)
+                    if (userData.academicProfile?.subjects && Array.isArray(userData.academicProfile.subjects)) {
+                        const { mapSubjectsToData } = await import("@/lib/subjectMapper");
+                        const userSubjects = mapSubjectsToData(userData.academicProfile.subjects);
+                        setSubjects(userSubjects);
+                        if (userSubjects.length > 0) {
+                            setSelectedSubject(userSubjects[0].id);
+                        }
+                    } 
+                    // Fallback to dashboardState
+                    else if (userData.dashboardState?.subjects) {
                         const userSubjects = userData.dashboardState.subjects.map((s: any) => ({
                             id: s.id,
                             name: s.name,
@@ -46,21 +56,19 @@ const StudyMaterials = () => {
                         if (userSubjects.length > 0) {
                             setSelectedSubject(userSubjects[0].id);
                         }
-                    } else {
-                        // Default subjects if not found
-                        const defaultSubjects: Subject[] = [
-                            { id: "mi", name: "Machine Intelligence", topics: [] },
-                            { id: "mpmc", name: "Microprocessor and Microcontroller", topics: [] },
-                            { id: "ivp", name: "Image and Video Processing", topics: [] },
-                            { id: "crypto-sec", name: "Cryptography and Security", topics: [] },
-                            { id: "daa", name: "Design & Analysis of Algorithms", topics: [] },
-                            { id: "toc", name: "Theory of Computation", topics: [] },
-                            { id: "se", name: "Software Engineering", topics: [] },
-                            { id: "cn", name: "Computer Networks", topics: [] },
-                        ];
-                        setSubjects(defaultSubjects);
-                        setSelectedSubject(defaultSubjects[0].id);
+                    } 
+                    // If no subjects found, show message
+                    else {
+                        setSubjects([]);
+                        toast.info("No subjects found", {
+                            description: "Please complete your goal setup on the landing page first.",
+                        });
                     }
+                } else {
+                    setSubjects([]);
+                    toast.info("Profile not found", {
+                        description: "Please complete your goal setup on the landing page first.",
+                    });
                 }
             } catch (error) {
                 console.error("Error loading subjects:", error);

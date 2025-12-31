@@ -140,16 +140,16 @@ const LandingPage = () => {
                     toast.success('Goal saved successfully!', {
                         description: 'Your AIM profile has been configured and saved to the cloud.',
                     });
-                    navigate('/dashboard');
+                    navigate('/materials');
                 }, 2000);
             } else {
                 console.warn("No user logged in, saving to local storage only via flow");
                 // Fallback flow or just redirect if auth is optional (though it seems required)
                 setTimeout(() => {
                     toast.success('Goal saved locally!', {
-                        description: 'Redirecting to Dashboard.',
+                        description: 'Redirecting to Study Materials.',
                     });
-                    navigate('/dashboard');
+                    navigate('/materials');
                 }, 2000);
             }
         } catch (error) {

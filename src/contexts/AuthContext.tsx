@@ -106,34 +106,94 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, emailToSignIn, password);
   };
 
-  // 📝 Register
+  // 📝 Register with local storage fallback
   const register = async (
     email: string,
     password: string,
     fullName: string,
     username: string
   ) => {
-    const q = query(
-      collection(db, "users"),
-      where("username", "==", username.toLowerCase())
-    );
-    const querySnapshot = await getDocs(q);
+    // Check username availability
+    let usernameAvailable = true;
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("username", "==", username.toLowerCase())
+      );
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        usernameAvailable = false;
+      }
+    } catch (error) {
+      console.warn("Could not check username availability, will try anyway:", error);
+    }
 
-    if (!querySnapshot.empty) {
+    if (!usernameAvailable) {
       throw new Error("Username already taken");
     }
 
-    const res = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(res.user, { displayName: fullName });
+    try {
+      // Try Firebase registration
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(res.user, { displayName: fullName });
 
-    await setDoc(doc(db, "users", res.user.uid), {
-      uid: res.user.uid,
-      email,
-      fullName,
-      username: username.toLowerCase(),
-      createdAt: new Date(),
-      onboardingCompleted: false,
-    });
+      try {
+        await setDoc(doc(db, "users", res.user.uid), {
+          uid: res.user.uid,
+          email,
+          fullName,
+          username: username.toLowerCase(),
+          createdAt: new Date(),
+          onboardingCompleted: false,
+        });
+      } catch (firestoreError) {
+        console.error("Firestore save failed, saving to local storage:", firestoreError);
+        // Fallback: Save to local storage
+        const localUserData = {
+          uid: res.user.uid,
+          email,
+          fullName,
+          username: username.toLowerCase(),
+          createdAt: new Date().toISOString(),
+          onboardingCompleted: false,
+          savedLocally: true,
+        };
+        localStorage.setItem(`user_${res.user.uid}`, JSON.stringify(localUserData));
+
+        // Try to sync to Firestore later
+        setTimeout(async () => {
+          try {
+            await setDoc(doc(db, "users", res.user.uid), localUserData, { merge: true });
+            localStorage.removeItem(`user_${res.user.uid}`);
+          } catch (retryError) {
+            console.warn("Retry sync failed:", retryError);
+          }
+        }, 5000);
+      }
+    } catch (error: any) {
+      // If Firebase auth fails, store registration attempt locally
+      if (error.code?.startsWith("auth/")) {
+        console.error("Firebase auth error:", error);
+        throw error; // Re-throw Firebase auth errors
+      }
+
+      // For other errors, save to local storage as fallback
+      console.warn("Registration failed, saving to local storage:", error);
+      const localRegistration = {
+        email,
+        fullName,
+        username: username.toLowerCase(),
+        password: btoa(password), // Basic encoding (not secure, but for verification)
+        createdAt: new Date().toISOString(),
+        pending: true,
+      };
+
+      const existingPending = JSON.parse(localStorage.getItem("pending_registrations") || "[]");
+      existingPending.push(localRegistration);
+      localStorage.setItem("pending_registrations", JSON.stringify(existingPending));
+
+      throw new Error("Registration failed. Your details have been saved locally. Please try again later.");
+    }
   };
 
   // 🚪 Logout

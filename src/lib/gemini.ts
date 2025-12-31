@@ -3,7 +3,10 @@
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyB9r7oNZQYPCgLoXgjdo5TWUrRARQKYdow";
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+
+// Try gemini-1.5-flash first, fallback to gemini-pro if it fails
+const getGeminiUrl = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
 export interface QuizQuestion {
   question: string;
@@ -30,7 +33,7 @@ export async function generateQuiz(
     throw new Error("Gemini API key is not configured");
   }
 
-  const topicsList = topics.length > 0 
+  const topicsList = topics.length > 0
     ? topics.join(", ")
     : "general concepts from this subject";
 
@@ -57,89 +60,111 @@ Return the response in the following JSON format (no markdown, just pure JSON):
 
 Make sure the JSON is valid and can be parsed directly.`;
 
-  try {
-    const response = await fetch(GEMINI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 4096,
+  // Try gemini-1.5-flash first, fallback to gemini-pro
+  const models = ["gemini-1.5-flash", "gemini-pro"];
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    try {
+      const response = await fetch(getGeminiUrl(model), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API Error:", errorData);
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error(`Gemini API Error (${model}):`, errorData);
 
-    const data = await response.json();
-    
-    // Extract text from Gemini response
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!textContent) {
-      throw new Error("No content received from Gemini API");
-    }
+        // If it's a 404 or 400, try next model
+        if (response.status === 404 || response.status === 400) {
+          lastError = new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+          continue; // Try next model
+        }
 
-    // Clean the response - remove markdown code blocks if present
-    let cleanedText = textContent.trim();
-    if (cleanedText.startsWith("```json")) {
-      cleanedText = cleanedText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-    } else if (cleanedText.startsWith("```")) {
-      cleanedText = cleanedText.replace(/^```\s*/, "").replace(/\s*```$/, "");
-    }
-
-    // Parse JSON
-    const quizJson = JSON.parse(cleanedText);
-
-    // Validate structure
-    if (!quizJson.questions || !Array.isArray(quizJson.questions)) {
-      throw new Error("Invalid quiz format from Gemini API");
-    }
-
-    // Ensure all questions have required fields
-    const validatedQuestions: QuizQuestion[] = quizJson.questions.map((q: any, index: number) => {
-      if (!q.question || !q.options || !Array.isArray(q.options) || q.options.length !== 4) {
-        throw new Error(`Invalid question format at index ${index}`);
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
       }
-      if (typeof q.correctAnswer !== "number" || q.correctAnswer < 0 || q.correctAnswer > 3) {
-        throw new Error(`Invalid correctAnswer at index ${index}`);
+
+      const data = await response.json();
+
+      // Extract text from Gemini response
+      const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textContent) {
+        throw new Error("No content received from Gemini API");
       }
+
+      // Clean the response - remove markdown code blocks if present
+      let cleanedText = textContent.trim();
+      if (cleanedText.startsWith("```json")) {
+        cleanedText = cleanedText.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+      } else if (cleanedText.startsWith("```")) {
+        cleanedText = cleanedText.replace(/^```\s*/, "").replace(/\s*```$/, "");
+      }
+
+      // Parse JSON
+      const quizJson = JSON.parse(cleanedText);
+
+      // Validate structure
+      if (!quizJson.questions || !Array.isArray(quizJson.questions)) {
+        throw new Error("Invalid quiz format from Gemini API");
+      }
+
+      // Ensure all questions have required fields
+      const validatedQuestions: QuizQuestion[] = quizJson.questions.map((q: any, index: number) => {
+        if (!q.question || !q.options || !Array.isArray(q.options) || q.options.length !== 4) {
+          throw new Error(`Invalid question format at index ${index}`);
+        }
+        if (typeof q.correctAnswer !== "number" || q.correctAnswer < 0 || q.correctAnswer > 3) {
+          throw new Error(`Invalid correctAnswer at index ${index}`);
+        }
+        return {
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation || "No explanation provided",
+        };
+      });
+
       return {
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation || "No explanation provided",
+        questions: validatedQuestions,
+        subject: subjectName,
+        topics,
+        generatedAt: new Date().toISOString(),
       };
-    });
-
-    return {
-      questions: validatedQuestions,
-      subject: subjectName,
-      topics,
-      generatedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error("Error generating quiz:", error);
-    if (error instanceof SyntaxError) {
-      throw new Error("Failed to parse quiz response from AI. Please try again.");
+    } catch (error) {
+      // If this is the last model, throw the error
+      if (model === models[models.length - 1]) {
+        console.error("Error generating quiz with all models:", error);
+        if (error instanceof SyntaxError) {
+          throw new Error("Failed to parse quiz response from AI. Please try again.");
+        }
+        throw lastError || error;
+      }
+      // Otherwise, continue to next model
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
     }
-    throw error;
   }
+
+  // If we get here, all models failed
+  throw lastError || new Error("Failed to generate quiz with all available models");
 }
 

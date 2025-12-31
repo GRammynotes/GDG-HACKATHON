@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export default function QuizModal({
   subjectName,
   topics,
 }: QuizModalProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quizState, setQuizState] = useState<QuizState | null>(null);
@@ -209,8 +211,15 @@ export default function QuizModal({
       toast.success("Quiz completed!", {
         description: `You scored ${score}/${quizState.questions.length} (${percentage}%)`,
       });
+
+      // Navigate to results page after a short delay
+      setTimeout(() => {
+        onClose();
+        navigate(`/quiz/${subjectId}/results`);
+      }, 2000);
     } catch (error) {
       console.error("Error saving quiz results:", error);
+      toast.error("Failed to save quiz results");
     }
   };
 

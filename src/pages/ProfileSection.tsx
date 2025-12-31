@@ -52,14 +52,46 @@ const ProfileSection = ({ state, setState }: ProfileSectionProps) => {
       }
     }
 
+    // Get data from academicProfile if available
+    const academicProfile = userData.academicProfile;
+    let year = userData.year || "3rd Year";
+    let semester = userData.semester || "Sem 5";
+    let subjectsLabel = "3rd Year PCE subjects based on chosen department (Comps / IT)";
+    let department = userData.department || "COMPS";
+
+    if (academicProfile) {
+      import("@/lib/subjectMapper").then(({ getYearLabel, getSemesterLabel }) => {
+        year = getYearLabel(academicProfile.year);
+        semester = getSemesterLabel(academicProfile.semester);
+        subjectsLabel = academicProfile.subjects?.join(", ") || subjectsLabel;
+        department = academicProfile.course === "btech-cse" ? "COMPS" : "IT";
+
+        const updatedProfile: ProfileState = {
+          name: userData.fullName || "",
+          email: currentUser.email || "",
+          department: department,
+          year: year,
+          semester: semester,
+          subjectsLabel: subjectsLabel,
+          targetDate: targetDate,
+        };
+
+        setFormData(updatedProfile);
+        setState((prev: any) => ({
+          ...prev,
+          profile: updatedProfile,
+        }));
+      });
+      return; // Exit early, will update in promise
+    }
+
     const hydratedProfile: ProfileState = {
       name: userData.fullName || "",
       email: currentUser.email || "",
-      department: userData.department || "COMPS",
-      year: userData.year || "3rd Year",
-      semester: userData.semester || "Sem 5",
-      subjectsLabel:
-        "3rd Year PCE subjects based on chosen department (Comps / IT)",
+      department: department,
+      year: year,
+      semester: semester,
+      subjectsLabel: subjectsLabel,
       targetDate: targetDate,
     };
 
